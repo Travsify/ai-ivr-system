@@ -62,6 +62,16 @@ def _load_custom_audio_for_user(user_id: str) -> Optional[bytes]:
                 data = f.read()
             USER_CUSTOM_AUDIO[user_id] = data
             return data
+    # Fallback: scan UPLOADS_DIR directly for any uploaded MP3 file (e.g. Drivri Let's Go.mp3)
+    if os.path.exists(UPLOADS_DIR):
+        for fname in os.listdir(UPLOADS_DIR):
+            if fname.lower().endswith('.mp3'):
+                file_path = os.path.join(UPLOADS_DIR, fname)
+                with open(file_path, "rb") as f:
+                    data = f.read()
+                USER_CUSTOM_AUDIO[user_id] = data
+                logger.info(f"Loaded fallback jingle audio from {fname}")
+                return data
     return None
 
 VAPI_PHONE_NUMBER = os.getenv("VAPI_PHONE_NUMBER", "+12138329797")
@@ -237,16 +247,15 @@ async def preview_hold_music(style: str, authorization: Optional[str] = Header(N
 @app.get("/api/audio/jingle/{style}.mp3")
 @app.get("/api/audio/jingle/{style}")
 async def serve_jingle_mp3(style: str, user_id: Optional[str] = "demo_user"):
-    """Serves the raw MP3/WAV binary audio file for SignalWire <Play> playback."""
+    """Serves the raw MP3 binary audio file for Twilio/SignalWire <Play> playback."""
     clean_style = style.replace(".mp3", "").replace(".wav", "")
     
-    if clean_style == "custom_upload":
-        audio_data = _load_custom_audio_for_user("6a083847") or _load_custom_audio_for_user("demo_user")
-        if audio_data:
-            return Response(content=audio_data, media_type="audio/mpeg")
+    audio_data = _load_custom_audio_for_user(user_id or "demo_user") or _load_custom_audio_for_user("demo_user") or _load_custom_audio_for_user("6a083847")
+    if audio_data:
+        return Response(content=audio_data, media_type="audio/mpeg")
             
     wav_bytes = generate_hold_music_wav_bytes(clean_style if clean_style != "custom_upload" else "stinger_corporate", duration=4.0)
-    return Response(content=wav_bytes, media_type="audio/wav")
+    return Response(content=wav_bytes, media_type="audio/mpeg")
 
 
 # --- Authentication & Persistent User Settings ---
