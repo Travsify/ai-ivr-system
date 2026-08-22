@@ -876,8 +876,7 @@ async def telephony_inbound(request: Request, user_id: Optional[str] = "demo_use
 @app.get("/telephony/jingle-forward/{user_id}")
 async def twiml_jingle_then_forward_to_vapi(request: Request, user_id: Optional[str] = "demo_user", From: Optional[str] = Form(None)):
     host_url = get_public_host_url(request)
-    music_style = get_effective_music_style(user_id, "stinger_corporate")
-    jingle_url = f"{host_url}/api/audio/jingle/{music_style}.mp3"
+    jingle_url = f"{host_url}/static/jingle.mp3"
     
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -915,8 +914,7 @@ async def twiml_full_ivr(request: Request, user_id: Optional[str] = "demo_user",
     dept_info = depts.get("router", list(depts.values())[0])
     full_greeting = dept_info.get("greeting", "Welcome to Drivri UK Logistics Solution! How may I help you today? Press 1 for Sales and Bookings. Press 2 for Customer Care. Press 3 for Accounts. Press 0 to speak directly with Jenny, Senior Operations Manager.")
     full_greeting_clean = full_greeting.replace("&", "and")
-    music_style = get_effective_music_style(user_id, "custom_upload")
-    jingle_url = f"{host_url}/api/audio/jingle/{music_style}.mp3"
+    jingle_url = f"{host_url}/static/jingle.mp3"
     
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
