@@ -1448,7 +1448,18 @@ async def vapi_post_call_webhook(request: Request):
     sms_text = f"Hi from Drivri UK! Thank you for speaking with Jenny. Your quote [{quote_id}] has been sent to {to_email}. Complete your booking: https://drivri.co.uk/signup?quote_id={quote_id}"
     sms_res = send_twilio_sms(phone, sms_text)
     
-    logger.info(f"[VAPI POST-CALL AUTOMATION] Quote {quote_id} sent to {to_email} and SMS sent to {phone}")
+    # 3. Dispatch Full Call Transcript + Audio Recording Link + Feedback to info@drivri.co.uk
+    rec_url = call.get("recordingUrl", message.get("recordingUrl"))
+    owner_report_res = email_service.send_owner_call_report(
+        caller_phone=phone,
+        caller_email=to_email,
+        transcript=transcript,
+        summary=summary,
+        recording_url=rec_url,
+        call_type="Vapi Call Activity Report"
+    )
+    
+    logger.info(f"[VAPI POST-CALL AUTOMATION] Quote {quote_id} sent to {to_email}, SMS sent to {phone}, and Call Report emailed to info@drivri.co.uk")
     
     return JSONResponse(content={
         "status": "success",
@@ -1456,7 +1467,8 @@ async def vapi_post_call_webhook(request: Request):
         "recipient_email": to_email,
         "recipient_phone": phone,
         "email_dispatch": email_res,
-        "sms_dispatch": sms_res
+        "sms_dispatch": sms_res,
+        "owner_report_dispatch": owner_report_res
     })
 
 

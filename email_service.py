@@ -166,3 +166,62 @@ def send_booking_quote_email(
         return {"status": "success", "to": to_email, "signup_url": signup_url}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+def send_owner_call_report(
+    caller_phone: str,
+    caller_email: str,
+    transcript: str,
+    summary: str,
+    recording_url: Optional[str] = None,
+    call_type: str = "Inbound / Outbound Call"
+) -> Dict[str, Any]:
+    """
+    Sends complete call recording link, transcript, customer email & phone summary
+    to info@drivri.co.uk after every single call!
+    """
+    from datetime import datetime
+    subject = f"📞 Call Activity Alert: {call_type} from {caller_phone} [{caller_email}]"
+    
+    rec_link = f"<p><strong>🎧 Audio Recording:</strong> <a href='{recording_url}' style='color: #0284c7; font-weight: bold;'>Listen to Call Audio Recording &rarr;</a></p>" if recording_url else ""
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="font-family: Arial, sans-serif; background: #f4f6f8; padding: 20px; color: #1e293b;">
+        <div style="max-width: 650px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+            <h2 style="color: #0f172a; border-bottom: 2px solid #0284c7; padding-bottom: 10px;">🚚 Drivri Call Activity Report</h2>
+            <p><strong>Call Type:</strong> {call_type}</p>
+            <p><strong>Customer Phone:</strong> <a href="tel:{caller_phone}">{caller_phone}</a></p>
+            <p><strong>Customer Email:</strong> <a href="mailto:{caller_email}">{caller_email}</a></p>
+            <p><strong>Call Date/Time:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}</p>
+            
+            <div style="background: #e0f2fe; border-left: 4px solid #0284c7; padding: 15px; border-radius: 6px; margin: 20px 0;">
+                <h3 style="margin-top: 0; color: #0369a1;">📝 Call Summary</h3>
+                <p style="margin-bottom: 0;">{summary}</p>
+            </div>
+            
+            {rec_link}
+            
+            <h3 style="color: #334155; margin-top: 25px;">📜 Complete Conversation Transcript</h3>
+            <div style="background: #f8fafc; border: 1px solid #cbd5e1; padding: 15px; border-radius: 6px; font-family: monospace; white-space: pre-wrap; font-size: 13px; max-height: 400px; overflow-y: auto;">
+{transcript or 'No transcript recorded.'}
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    payload = {
+        "from": FROM_EMAIL,
+        "to": ["info@drivri.co.uk"],
+        "subject": subject,
+        "html": html_content
+    }
+    
+    headers = {"Authorization": OPENRESEND_AUTH, "Content-Type": "application/json"}
+    try:
+        res = httpx.post(OPENRESEND_URL, json=payload, headers=headers, timeout=8.0)
+        return {"status": "success", "to": "info@drivri.co.uk"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
