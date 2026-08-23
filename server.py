@@ -1406,6 +1406,42 @@ def send_twilio_sms(to_phone: str, message_body: str) -> Dict[str, Any]:
         return {"status": "error", "message": str(e)}
 
 
+def sanitize_and_extract_spoken_email(text: str) -> Optional[str]:
+    """
+    Cleans, normalizes, and extracts spoken email addresses from Speech-to-Text transcripts.
+    Converts spoken tokens ('dot', 'at', 'dash', 'underscore') and corrects STT domain typos.
+    """
+    if not text:
+        return None
+        
+    # 1. Standard regex match first
+    standard_match = re.search(r'[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}', text)
+    if standard_match:
+        raw_email = standard_match.group(0).lower().strip(".,! ")
+        # Auto-correct common domain typos
+        raw_email = re.sub(r'@(gmai|gmale|gamil)\.com$', '@gmail.com', raw_email)
+        raw_email = re.sub(r'@(hotmal|hotmai|hotmial)\.com$', '@hotmail.com', raw_email)
+        raw_email = re.sub(r'@(yaho|yahou)\.com$', '@yahoo.com', raw_email)
+        raw_email = re.sub(r'@(outlok|outloo)\.com$', '@outlook.com', raw_email)
+        return raw_email
+
+    # 2. Spoken Token Normalization (e.g. 'john dot smith at gmail dot com')
+    clean = text.lower()
+    clean = clean.replace(" at ", "@").replace(" dot ", ".").replace(" dash ", "-").replace(" underscore ", "_")
+    clean = clean.replace(" [at] ", "@").replace(" [dot] ", ".").replace(" ", "")
+
+    spoken_match = re.search(r'[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}', clean)
+    if spoken_match:
+        raw_email = spoken_match.group(0).strip(".,! ")
+        raw_email = re.sub(r'@(gmai|gmale|gamil)\.com$', '@gmail.com', raw_email)
+        raw_email = re.sub(r'@(hotmal|hotmai|hotmial)\.com$', '@hotmail.com', raw_email)
+        raw_email = re.sub(r'@(yaho|yahou)\.com$', '@yahoo.com', raw_email)
+        raw_email = re.sub(r'@(outlok|outloo)\.com$', '@outlook.com', raw_email)
+        return raw_email
+
+    return None
+
+
 @app.post("/api/vapi/webhook")
 async def vapi_post_call_webhook(request: Request):
     """
@@ -1425,9 +1461,8 @@ async def vapi_post_call_webhook(request: Request):
     summary = message.get("summary", body.get("summary", "Drivri Booking Consultation"))
     transcript = message.get("transcript", body.get("transcript", ""))
     
-    # Extract email address from transcript or summary if collected by Jenny
-    email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', transcript + " " + summary)
-    to_email = email_match.group(0) if email_match else "customer@drivri.co.uk"
+    # Extract & sanitize email address from transcript or summary
+    to_email = sanitize_and_extract_spoken_email(transcript + " " + summary) or "customer@drivri.co.uk"
     
     quote_id = f"DRV-{str(uuid.uuid4())[:6].upper()}"
     
