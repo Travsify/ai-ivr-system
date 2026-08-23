@@ -914,7 +914,7 @@ async def twiml_full_ivr(request: Request, user_id: Optional[str] = "demo_user",
     dept_info = depts.get("router", list(depts.values())[0])
     full_greeting = dept_info.get("greeting", "Welcome to Drivri UK Logistics Solution! How may I help you today? Press 1 for Sales and Bookings. Press 2 for Customer Care. Press 3 for Accounts. Press 0 to speak directly with Jenny, Senior Operations Manager.")
     full_greeting_clean = full_greeting.replace("&", "and")
-    jingle_url = f"{host_url}/static/jingle.mp3"
+    jingle_url = f"{host_url}/api/audio/jingle/stinger_corporate.mp3"
     
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
@@ -1375,6 +1375,81 @@ async def bland_webhook(request: Request, user_id: str = "demo_user"):
         db.record_transcript(session_id, "Full Call", "router", transcript)
     
     return JSONResponse(content={"status": "received", "session_id": session_id})
+
+
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID", "")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN", "YOUR_TWILIO_AUTH_TOKEN")
+TWILIO_PHONE_NUMBER = os.getenv("TWILIO_PHONE_NUMBER", "+447888862317")
+
+def send_twilio_sms(to_phone: str, message_body: str) -> Dict[str, Any]:
+    """Sends a text message using Twilio SMS API from +447888862317."""
+    try:
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{TWILIO_ACCOUNT_SID}/Messages.json"
+        data = {
+            "From": TWILIO_PHONE_NUMBER,
+            "To": to_phone,
+            "Body": message_body
+        }
+        with httpx.Client(timeout=10.0) as client:
+            res = client.post(url, data=data, auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN))
+            return res.json()
+    except Exception as e:
+        logger.error(f"Twilio SMS error: {e}")
+        return {"status": "error", "message": str(e)}
+
+
+@app.post("/api/vapi/webhook")
+async def vapi_post_call_webhook(request: Request):
+    """
+    Receives post-call webhook reports from Vapi (end-of-call-report).
+    Triggers automated Resend Email + Twilio SMS dispatch to the caller!
+    """
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+        
+    message = body.get("message", {})
+    call = message.get("call", body.get("call", {}))
+    customer = call.get("customer", {})
+    
+    phone = customer.get("number", body.get("from", "+447911123456"))
+    summary = message.get("summary", body.get("summary", "Drivri Booking Consultation"))
+    transcript = message.get("transcript", body.get("transcript", ""))
+    
+    # Extract email address from transcript or summary if collected by Jenny
+    email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', transcript + " " + summary)
+    to_email = email_match.group(0) if email_match else "customer@drivri.co.uk"
+    
+    quote_id = f"DRV-{str(uuid.uuid4())[:6].upper()}"
+    
+    # 1. Dispatch Executive HTML Email via Resend API
+    email_res = email_service.send_booking_quote_email(
+        to_email=to_email,
+        customer_name="Valued Customer",
+        quote_id=quote_id,
+        service_type="Courier & Driver Hire",
+        vehicle_or_licence="Luton Van / Fleet Transport",
+        pickup_address="London / Greater London",
+        delivery_address="UK Destination Address",
+        preferred_date="Tomorrow Morning",
+        quoted_price=145.00
+    )
+    
+    # 2. Dispatch Instant SMS via Twilio UK Number (+447888862317)
+    sms_text = f"Hi from Drivri UK! Thank you for speaking with Jenny. Your quote [{quote_id}] has been sent to {to_email}. Complete your booking: https://drivri.co.uk/signup?quote_id={quote_id}"
+    sms_res = send_twilio_sms(phone, sms_text)
+    
+    logger.info(f"[VAPI POST-CALL AUTOMATION] Quote {quote_id} sent to {to_email} and SMS sent to {phone}")
+    
+    return JSONResponse(content={
+        "status": "success",
+        "quote_id": quote_id,
+        "recipient_email": to_email,
+        "recipient_phone": phone,
+        "email_dispatch": email_res,
+        "sms_dispatch": sms_res
+    })
 
 
 class LeadCampaignRequest(BaseModel):
