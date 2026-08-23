@@ -62,6 +62,14 @@ def _load_custom_audio_for_user(user_id: str) -> Optional[bytes]:
                 data = f.read()
             USER_CUSTOM_AUDIO[user_id] = data
             return data
+    # Priority fallback: direct static/jingle.mp3 (Drivri Let's Go.mp3)
+    static_jingle = os.path.join(os.path.dirname(__file__), "static", "jingle.mp3")
+    if os.path.exists(static_jingle):
+        with open(static_jingle, "rb") as f:
+            data = f.read()
+        USER_CUSTOM_AUDIO[user_id] = data
+        logger.info("Loaded static/jingle.mp3 into memory")
+        return data
     # Fallback: scan UPLOADS_DIR directly for any uploaded MP3 file (e.g. Drivri Let's Go.mp3)
     if os.path.exists(UPLOADS_DIR):
         for fname in os.listdir(UPLOADS_DIR):
