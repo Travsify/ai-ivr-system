@@ -50,8 +50,14 @@ def _reload_custom_audio_from_disk():
             logger.info(f"Loaded custom audio for user {user_id} from {mapping['file_id']}")
 
 
+try:
+    from jingle_data import get_embedded_jingle_mp3_bytes
+except Exception:
+    get_embedded_jingle_mp3_bytes = None
+
+
 def _load_custom_audio_for_user(user_id: str) -> Optional[bytes]:
-    """Load custom audio for a user from disk if not in memory."""
+    """Load custom audio for a user from disk, memory, or embedded module."""
     if user_id in USER_CUSTOM_AUDIO:
         return USER_CUSTOM_AUDIO[user_id]
     mapping = db.get_user_custom_audio_mapping(user_id)
@@ -62,24 +68,19 @@ def _load_custom_audio_for_user(user_id: str) -> Optional[bytes]:
                 data = f.read()
             USER_CUSTOM_AUDIO[user_id] = data
             return data
-    # Priority fallback: direct static/jingle.mp3 (Drivri Let's Go.mp3)
+    # Direct static/jingle.mp3 check
     static_jingle = os.path.join(os.path.dirname(__file__), "static", "jingle.mp3")
     if os.path.exists(static_jingle):
         with open(static_jingle, "rb") as f:
             data = f.read()
         USER_CUSTOM_AUDIO[user_id] = data
-        logger.info("Loaded static/jingle.mp3 into memory")
         return data
-    # Fallback: scan UPLOADS_DIR directly for any uploaded MP3 file (e.g. Drivri Let's Go.mp3)
-    if os.path.exists(UPLOADS_DIR):
-        for fname in os.listdir(UPLOADS_DIR):
-            if fname.lower().endswith('.mp3'):
-                file_path = os.path.join(UPLOADS_DIR, fname)
-                with open(file_path, "rb") as f:
-                    data = f.read()
-                USER_CUSTOM_AUDIO[user_id] = data
-                logger.info(f"Loaded fallback jingle audio from {fname}")
-                return data
+    # Zero-failure embedded MP3 byte fallback (Drivri Let's Go.mp3)
+    if get_embedded_jingle_mp3_bytes:
+        data = get_embedded_jingle_mp3_bytes()
+        USER_CUSTOM_AUDIO[user_id] = data
+        logger.info("Loaded embedded Drivri Let's Go.mp3 bytes from jingle_data.py")
+        return data
     return None
 
 VAPI_PHONE_NUMBER = os.getenv("VAPI_PHONE_NUMBER", "+12138329797")
