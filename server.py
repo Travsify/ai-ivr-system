@@ -918,14 +918,15 @@ async def twiml_full_ivr(request: Request, user_id: Optional[str] = "demo_user",
     
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Play>{jingle_url}</Play>
     <Gather action="{host_url}/telephony/gather/{user_id}?current_dept=router" input="dtmf" numDigits="1" timeout="10">
-        <Say voice="Polly.Amy">{full_greeting_clean}</Say>
+        <Say voice="Polly.Amy">Hello and welcome to Drivri UK Logistics Solution!</Say>
+        <Play>{jingle_url}</Play>
+        <Say voice="Polly.Amy">Please listen carefully to our options: Press 1 for Sales and Bookings. Press 2 for Customer Care and Support. Press 3 for Accounts and Billing. Press 0 to speak directly with Jenny, Senior Operations Manager.</Say>
     </Gather>
     <Gather action="{host_url}/telephony/gather/{user_id}?current_dept=router" input="dtmf" numDigits="1" timeout="7">
         <Say voice="Polly.Amy">We noticed you haven't selected an option yet. Press 1 for Sales, press 2 for Support, press 3 for Accounts, or press 0 for Jenny.</Say>
     </Gather>
-    <Say voice="Polly.Amy">Connecting you to Jenny, Senior Operations Manager. Please hold.</Say>
+    <Say voice="Polly.Amy">Connecting you now to Jenny, Senior Operations Manager. Please hold.</Say>
     <Dial>{VAPI_PHONE_NUMBER}</Dial>
 </Response>"""
     return Response(content=twiml, media_type="text/xml")
