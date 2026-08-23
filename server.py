@@ -914,7 +914,7 @@ async def twiml_full_ivr(request: Request, user_id: Optional[str] = "demo_user",
     dept_info = depts.get("router", list(depts.values())[0])
     full_greeting = dept_info.get("greeting", "Welcome to Drivri UK Logistics Solution! How may I help you today? Press 1 for Sales and Bookings. Press 2 for Customer Care. Press 3 for Accounts. Press 0 to speak directly with Jenny, Senior Operations Manager.")
     full_greeting_clean = full_greeting.replace("&", "and")
-    jingle_url = f"{host_url}/api/audio/jingle/stinger_corporate.mp3"
+    jingle_url = f"{host_url}/api/audio/jingle/custom_upload.mp3"
     
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
