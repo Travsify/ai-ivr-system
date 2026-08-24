@@ -928,9 +928,8 @@ async def twiml_full_ivr(request: Request, user_id: Optional[str] = "demo_user",
     twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Gather action="{host_url}/telephony/gather/{user_id}?current_dept=router" input="dtmf" numDigits="1" timeout="10">
-        <Say voice="Polly.Amy">Hello and welcome to Drivri UK Logistics Solution!</Say>
         <Play>{jingle_url}</Play>
-        <Say voice="Polly.Amy">Please listen carefully to our options: Press 1 for Sales and Bookings. Press 2 for Customer Care and Support. Press 3 for Accounts and Billing. Press 0 to speak directly with Jenny, Senior Operations Manager.</Say>
+        <Say voice="Polly.Amy">Welcome to Drivri UK Logistics Solution! Please listen carefully to our options: Press 1 for Sales and Bookings. Press 2 for Customer Care and Support. Press 3 for Accounts and Billing. Press 0 to speak directly with Jenny, Senior Operations Manager.</Say>
     </Gather>
     <Gather action="{host_url}/telephony/gather/{user_id}?current_dept=router" input="dtmf" numDigits="1" timeout="7">
         <Say voice="Polly.Amy">We noticed you haven't selected an option yet. Press 1 for Sales, press 2 for Support, press 3 for Accounts, or press 0 for Jenny.</Say>
@@ -1410,30 +1409,38 @@ def send_twilio_sms(to_phone: str, message_body: str) -> Dict[str, Any]:
 def sanitize_and_extract_spoken_email(text: str) -> Optional[str]:
     """
     Cleans, normalizes, and extracts spoken email addresses from Speech-to-Text transcripts.
-    Converts spoken tokens ('dot', 'at', 'dash', 'underscore') and corrects STT domain typos.
+    Handles spelled-out letters ('I n f o at t r a v s I f y . c o m') and spoken tokens
+    ('info at travsify dot com') without gluing surrounding transcript words.
     """
     if not text:
         return None
-        
-    # 1. Standard regex match first
-    standard_match = re.search(r'[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}', text)
+
+    # 1. Standard regex match first (e.g. info@travsify.com)
+    standard_match = re.search(r'\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b', text)
     if standard_match:
         raw_email = standard_match.group(0).lower().strip(".,! ")
-        # Auto-correct common domain typos
         raw_email = re.sub(r'@(gmai|gmale|gamil)\.com$', '@gmail.com', raw_email)
         raw_email = re.sub(r'@(hotmal|hotmai|hotmial)\.com$', '@hotmail.com', raw_email)
         raw_email = re.sub(r'@(yaho|yahou)\.com$', '@yahoo.com', raw_email)
         raw_email = re.sub(r'@(outlok|outloo)\.com$', '@outlook.com', raw_email)
         return raw_email
 
-    # 2. Spoken Token Normalization (e.g. 'john dot smith at gmail dot com')
-    clean = text.lower()
-    clean = clean.replace(" at ", "@").replace(" dot ", ".").replace(" dash ", "-").replace(" underscore ", "_")
-    clean = clean.replace(" [at] ", "@").replace(" [dot] ", ".").replace(" ", "")
+    # 2. Collapse spelled-out letters (e.g. 'I n f o' -> 'info', 't r a v s i f y' -> 'travsify')
+    text_collapsed = re.sub(r'\b([a-zA-Z])\s+(?=[a-zA-Z]\b)', r'\1', text)
 
-    spoken_match = re.search(r'[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}', clean)
-    if spoken_match:
-        raw_email = spoken_match.group(0).strip(".,! ")
+    # 3. Match spoken tokens: <user> at <domain> dot <tld>
+    spoken_pattern = r'([a-zA-Z0-9._%+-]+)\s+(?:at|\[at\]|@)\s+([a-zA-Z0-9.-]+)\s+(?:dot|\[dot\]|\.)\s+([a-zA-Z]{2,})'
+    match = re.search(spoken_pattern, text_collapsed, re.IGNORECASE)
+    if match:
+        user_part, domain_part, tld_part = match.groups()
+        user_part = user_part.lower().strip(".,! ")
+        domain_part = domain_part.lower().replace(" ", "").strip(".,! ")
+        tld_part = tld_part.lower().strip(".,! ")
+
+        if " " in user_part:
+            user_part = user_part.split()[-1]
+
+        raw_email = f"{user_part}@{domain_part}.{tld_part}"
         raw_email = re.sub(r'@(gmai|gmale|gamil)\.com$', '@gmail.com', raw_email)
         raw_email = re.sub(r'@(hotmal|hotmai|hotmial)\.com$', '@hotmail.com', raw_email)
         raw_email = re.sub(r'@(yaho|yahou)\.com$', '@yahoo.com', raw_email)

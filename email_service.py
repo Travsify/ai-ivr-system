@@ -7,9 +7,17 @@ import os
 import httpx
 from typing import Dict, Any, Optional
 
-# OpenResend API Configuration
-OPENRESEND_URL = os.environ.get("OPENRESEND_URL", "http://localhost:8920/v1/emails")
-OPENRESEND_AUTH = os.environ.get("OPENRESEND_AUTH", "Bearer re_prod_vapi_drivri_2026_key")
+# Official Resend API Configuration
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", os.environ.get("OPENRESEND_AUTH", "re_prod_vapi_drivri_2026_key"))
+RESEND_URL = os.environ.get("RESEND_URL", os.environ.get("OPENRESEND_URL", "https://api.resend.com/emails"))
+
+# Ensure proper Bearer prefix for Resend Authorization
+if not RESEND_API_KEY.startswith("Bearer ") and not RESEND_API_KEY.startswith("http"):
+    OPENRESEND_AUTH = f"Bearer {RESEND_API_KEY}"
+else:
+    OPENRESEND_AUTH = RESEND_API_KEY
+
+OPENRESEND_URL = RESEND_URL
 FROM_EMAIL = os.environ.get("FROM_EMAIL", "Drivri Business <info@drivri.co.uk>")
 
 
